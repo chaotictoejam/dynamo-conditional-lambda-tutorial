@@ -1,0 +1,32 @@
+service: dynamo-conditional-lambda-tutorial
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+
+functions:
+  getUser:
+    handler: handler.getUser
+    events:
+      - httpApi:
+          path: /{userId}
+          method: get
+  updateUser:
+    handler: handler.updateUser
+    events:
+      - httpApi:
+          path: /{userId}
+          method: put
+  createUser:
+    handler: handler.createUser
+    events:
+      - httpApi:
+          path: /
+          method: post
+  deleteUser:
+    handler: handler.deleteUser
+    events:
+      - httpApi:
+          path: /{userId}
+          method: delete
