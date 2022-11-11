@@ -1,31 +1,30 @@
-"use strict";
+'use strict';
 
 const crypto = require('crypto')
-const doc = require('dynamodb-doc');
-const dynamodb = new doc.DynamoDB();
+const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 
-const tableName = "Users";
+const tableName = 'Users';
 
 module.exports.getUser = (event, context, callback) => {
   const params = {
     TableName: tableName,
     Key: {
-      'UserId': event.pathParameters.userId
+      'PK': "USER#"+event.pathParameters.userId
     }
   }
-  dynamodb.getItem(params)
+  dynamodb.get(params)
     .promise()
     .then(data => {
-      if (!isEmpty(data)){
-        console.log(data)
+      if (data.Item){
         callback(null, {
           statusCode: 200,
-          body: data,
+          body: data.Item,
         });
       } else {
         callback(null, {
           statusCode: 404,
-          body: "No user exists"
+          body: 'No user exists'
         });
       }
   }).catch((err) => {
@@ -37,17 +36,18 @@ module.exports.getUser = (event, context, callback) => {
 module.exports.updateUser = (event, context, callback) => {
   console.log(event);
   const item = {
-    "UserId": event.pathParameters.userId,
-    "FirstName": event.body.firstName,
-    "LastName": event.body.lastName,
-    "Email": event.body.email
+    'PK': 'USER#'+event.pathParameters.userId,
+    'UserId': event.pathParameters.userId,
+    'FirstName': event.body.firstName,
+    'LastName': event.body.lastName,
+    'Email': event.body.email
   };
   const params = {
-    ConditionExpression: 'attribute_exists(UserId)',
+    ConditionExpression: 'attribute_exists(PK)',
     TableName: tableName,
     Item: item
   }
-  dynamodb.putItem(params)
+  dynamodb.put(params)
     .promise()
     .then(() => {
       callback(null, {
@@ -60,20 +60,35 @@ module.exports.updateUser = (event, context, callback) => {
     });
 };
 
-// TO DO Complete Example for Transaction
 module.exports.createUser = (event, context, callback) => {
-  const item = {
-    "UserId": crypto.randomUUID(),
-    "FirstName": event.body.firstName,
-    "LastName": event.body.lastName,
-    "Email": event.body.email
+  const userId = crypto.randomUUID();
+  const transactItems = {
+    TransactItems: [
+      {
+        Put: {
+          TableName: tableName,
+          Item: {
+            'PK': 'USER#' + userId,
+            'UserId': userId,
+            'FirstName': event.body.firstName,
+            'LastName': event.body.lastName,
+            'Email': event.body.email
+          },
+          ConditionExpression: 'attribute_not_exists(PK)'
+        }
+      },
+      {
+        Put: {
+          TableName: tableName,
+          Item: {
+            'PK': 'EMAIL#' + event.body.email
+          },
+          ConditionExpression: 'attribute_not_exists(PK)'
+        }
+      }
+    ]
   };
-  const params = {
-    ConditionExpression: 'attribute_not_exists(Email)',
-    TableName: tableName,
-    Item: item
-  }
-  dynamodb.putItem(params)
+  dynamodb.transactWrite(transactItems)
     .promise()
     .then(() => {
       callback(null, {
@@ -83,8 +98,12 @@ module.exports.createUser = (event, context, callback) => {
     }).catch((err) => {
       // If an error occurs write to the console
       console.error(err);
+      callback(null, {
+        statusCode: 400,
+        body: err.message
+      });
     });
-};
+}
 
 // TO DO Complete Example for Transaction
 module.exports.deleteUser = (event, context, callback) => {
@@ -92,7 +111,7 @@ module.exports.deleteUser = (event, context, callback) => {
     statusCode: 200,
     body: JSON.stringify(
       {
-        message: "Go Serverless v3.0! Your function executed successfully!",
+        message: 'Go Serverless v3.0! Your function executed successfully!',
         input: event,
       },
       null,
@@ -100,7 +119,3 @@ module.exports.deleteUser = (event, context, callback) => {
     ),
   };
 };
-
-function isEmpty(object) {
-  return Object.keys(object).length === 0
-}

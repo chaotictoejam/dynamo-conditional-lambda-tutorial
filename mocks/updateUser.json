@@ -4,6 +4,7 @@
     },
     "body": {
         "firstName": "Janet",
-        "lastName": "Smith"
+        "lastName": "Smith",
+        "email": "test@test.com"
     }
 }
