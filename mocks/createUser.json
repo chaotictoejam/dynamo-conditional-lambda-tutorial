@@ -2,6 +2,7 @@
     "body": {
         "firstName": "John",
         "lastName": "Smith",
-        "email": "jsmith@email.com"
+        "email": "jsmith2@email.com",
+        "rewardBalance": 100
     }
 }

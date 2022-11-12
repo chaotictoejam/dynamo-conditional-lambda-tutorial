@@ -40,7 +40,8 @@ module.exports.updateUser = (event, context, callback) => {
     'UserId': event.pathParameters.userId,
     'FirstName': event.body.firstName,
     'LastName': event.body.lastName,
-    'Email': event.body.email
+    'Email': event.body.email,
+    'rewardBalance' : event.body.rewardBalance
   };
   const params = {
     ConditionExpression: 'attribute_exists(PK)',
@@ -72,7 +73,8 @@ module.exports.createUser = (event, context, callback) => {
             'UserId': userId,
             'FirstName': event.body.firstName,
             'LastName': event.body.lastName,
-            'Email': event.body.email
+            'Email': event.body.email,
+            'rewardBalance': event.body.rewardBalance
           },
           ConditionExpression: 'attribute_not_exists(PK)'
         }
@@ -105,17 +107,100 @@ module.exports.createUser = (event, context, callback) => {
     });
 }
 
-// TO DO Complete Example for Transaction
 module.exports.deleteUser = (event, context, callback) => {
-  return {
-    statusCode: 200,
-    body: JSON.stringify(
-      {
-        message: 'Go Serverless v3.0! Your function executed successfully!',
-        input: event,
+  const userId = event.pathParameters.userId;
+
+  //Get Users Email
+  const params = {
+    TableName: tableName,
+    Key: {
+      'PK': "USER#" + userId
+    }
+  }
+  dynamodb.get(params)
+    .promise()
+    .then(data => {
+      var email = data.Item?.Email;
+      const transactItems = {
+        TransactItems: [
+          {
+            Delete: {
+              TableName: tableName,
+              Key: {
+                'PK': "USER#" + userId
+              }
+            }
+          },
+          {
+            Delete: {
+              TableName: tableName,
+              Key: {
+                'PK': "EMAIL#" + email
+              }
+            }
+          }
+        ]
+      }
+      dynamodb.transactWrite(transactItems)
+        .promise()
+        .then(() => {
+          callback(null, {
+            statusCode: 200,
+            body: ''
+          });
+        }).catch((err) => {
+          // If an error occurs write to the console
+          console.error(err);
+          callback(null, {
+            statusCode: 400,
+            body: err.message
+          });
+        });
+    }).catch((err) => {
+      callback(null, {
+        statusCode: 400,
+        body: err.message
+      });
+    });
+}
+
+module.exports.updateUserRewards = (event, context, callback) => {
+  let params = {};
+  if (event.body.operator === "+") {
+    params = {
+      TableName: tableName,
+      Key: {
+        'PK': 'USER#' + event.pathParameters.userId
       },
-      null,
-      2
-    ),
-  };
-};
+      UpdateExpression: 'SET RewardBalance = RewardBalance + :amount',
+      ExpressionAttributeValues: {
+        ":amount": event.body.amount
+      }
+    }
+  } else {
+    params = {
+      TableName: tableName,
+      Key: {
+        'PK': 'USER#' + event.pathParameters.userId
+      },
+      ConditionExpression: 'RewardBalance >= :amount',
+      UpdateExpression: 'SET RewardBalance = RewardBalance - :amount',
+      ExpressionAttributeValues: {
+        ":amount": event.body.amount
+      }
+    }
+  }
+  dynamodb.update(params)
+    .promise()
+    .then(() => {
+      callback(null, {
+        statusCode: 200,
+        body: ''
+      });
+    }).catch((err) => {
+      callback(null, {
+        statusCode: 400,
+        body: err.message
+      });
+    });
+}

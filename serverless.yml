@@ -30,3 +30,9 @@ functions:
       - httpApi:
           path: /{userId}
           method: delete
+  updateUserRewards:
+    handler: handler.updateUserRewards
+    events:
+      - httpApi:
+          path: /{userId}/rewards
+          method: put
